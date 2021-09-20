@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.kears import Model
 from tensorflow.keras.layers import Layer, Dense, LSTM
 from tensorflow.keras.constraints import Constraint
 
@@ -146,7 +147,7 @@ class RITS(Layer):
         return imputations, predictions
 
 
-class BRITS(Layer):
+class BRITS(Model):
     def __init__(self, hid_dim, dropout_rate, batch_size, name='BRITS', **kwargs):
         super(BRITS, self).__init__(name=name, **kwargs)
 
