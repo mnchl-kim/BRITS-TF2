@@ -54,12 +54,11 @@ class TemporalDecay(Layer):
 
 
 class RITS(Layer):
-    def __init__(self, hid_dim, dropout_rate, batch_size, go_backwards=False, name='RITS', **kwargs):
+    def __init__(self, hid_dim, dropout_rate, go_backwards=False, name='RITS', **kwargs):
         super(RITS, self).__init__(name=name, **kwargs)
 
         self.hid_dim = hid_dim
         self.dropout_rate = dropout_rate
-        self.batch_size = batch_size
         self.go_backwards = go_backwards
 
     def build(self, input_shape):
@@ -89,10 +88,12 @@ class RITS(Layer):
             imputations -- shape: (N, (x_hat, z_hat, c_hat), t, d)
             predictions -- shape: (N, 1)
         """
-
+        
+        batch_size = tf.shape(inputs)[0]
+        
         # LSTM state
-        state_h = tf.zeros(shape=(self.batch_size, self.hid_dim), dtype=tf.float32)
-        state_c = tf.zeros(shape=(self.batch_size, self.hid_dim), dtype=tf.float32)
+        state_h = tf.zeros(shape=(batch_size, self.hid_dim), dtype=tf.float32)
+        state_c = tf.zeros(shape=(batch_size, self.hid_dim), dtype=tf.float32)
 
         imputations_x = []
         imputations_z = []
@@ -148,16 +149,15 @@ class RITS(Layer):
 
 
 class BRITS(Model):
-    def __init__(self, hid_dim, dropout_rate, batch_size, name='BRITS', **kwargs):
+    def __init__(self, hid_dim, dropout_rate, name='BRITS', **kwargs):
         super(BRITS, self).__init__(name=name, **kwargs)
 
         self.hid_dim = hid_dim
         self.dropout_rate = dropout_rate
-        self.batch_size = batch_size
 
     def build(self, input_shape):
-        self.rits_forward = RITS(self.hid_dim, self.dropout_rate, self.batch_size, go_backwards=False, name="RITS_forward")
-        self.rits_backward = RITS(self.hid_dim, self.dropout_rate, self.batch_size, go_backwards=True, name="RITS_backward")
+        self.rits_forward = RITS(self.hid_dim, self.dropout_rate, go_backwards=False, name="RITS_forward")
+        self.rits_backward = RITS(self.hid_dim, self.dropout_rate, go_backwards=True, name="RITS_backward")
 
     @tf.function
     def call(self, inputs):
@@ -170,7 +170,8 @@ class BRITS(Model):
                 d -- time delta
         Returns:
             imputations -- shape: (N, (f, b), (x_hat, z_hat, c_hat), t, d)
-            predictions -- shape: (N, (f, b), 1)
+            # predictions -- shape: (N, (f, b), 1)
+            predictions -- shape: (N, 1)
         """
 
         imputations_forward, predictions_forward = self.rits_forward(inputs)
@@ -178,7 +179,8 @@ class BRITS(Model):
 
         imputations = tf.concat([tf.expand_dims(imputations_forward, axis=1),
                                  tf.expand_dims(imputations_backward, axis=1)], axis=1)
-        predictions = tf.concat([tf.expand_dims(predictions_forward, axis=1),
-                                 tf.expand_dims(predictions_backward, axis=1)], axis=1)
+        # predictions = tf.concat([tf.expand_dims(predictions_forward, axis=1),
+        #                          tf.expand_dims(predictions_backward, axis=1)], axis=1)
+        predictions = (predictions_forward + predictions_backward) / 2
 
         return imputations, predictions
